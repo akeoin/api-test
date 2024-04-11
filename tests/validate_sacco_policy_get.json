@@ -2,6 +2,7 @@
   "name": "Validate_Sacco_Policy_Update",
   "steps": [
     {
+      "name": "getAboutSaccoPolicy",
       "api": "/api/policy/aboutsaccospolicy/get",
       "order": 1,
       "method": "get",
@@ -9,11 +10,12 @@
       "expected": {
         "status": 200,
         "response": {
-          "result.id": 68
+          "$getAboutSaccoPolicy.result.id": 68
         }
       }
     },
     {
+      "name": "updateAboutSaccoPolicy",
       "api": "/api/policy/aboutsaccospolicy/update",
       "order": 2,
       "method": "put",
@@ -24,8 +26,25 @@
       "expected": {
         "status": 200,
         "response": {
-          "result.scope": "Updated scope of the policy",
-          "result.activitiesAddress": "Updated address of sacco activities"
+          "$updateAboutSaccoPolicy.result.scope": "Updated scope of the policy",
+          "$updateAboutSaccoPolicy.result.activitiesAddress": "Updated address of sacco activities"
+        }
+      }
+    },
+    {
+      "name": "updateAboutSaccoPolicy",
+      "api": "/api/policy/aboutsaccospolicy/update",
+      "order": 2,
+      "method": "put",
+      "payload": { 
+        "scope":"$getAboutSaccoPolicy.result.activitiesAddress",
+        "activitiesAddress":"Updated address of sacco activities"
+      },
+      "expected": {
+        "status": 200,
+        "response": {
+          "$updateAboutSaccoPolicy.result.scope": "Updated scope of the policy",
+          "$updateAboutSaccoPolicy.result.activitiesAddress": "Updated address of sacco activities"
         }
       }
     }

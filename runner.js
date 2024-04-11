@@ -3,9 +3,9 @@ const axios = require("axios");
 require("dotenv").config();
 const jsonexport = require("jsonexport");
 const bystring = require("object-bystring");
-
+var testStepData = {};
 var args = process.argv.slice(2);
-var swaggerDoc = JSON.parse(fs.readFileSync(args[0], "utf8"));
+// var swaggerDoc = JSON.parse(fs.readFileSync(args[0], "utf8"));
 var testData = JSON.parse(fs.readFileSync("data.json", "utf8"));
 
 const instance = axios.create({
@@ -15,42 +15,81 @@ const instance = axios.create({
 });
 
 //read directory
+const populatePayload = (data) => {
+  // console.log("data", data);
+  Object.keys(data).forEach((key) => {
+      const value = data[key];
+      console.log(`Key: ${key}, Value: ${value}`);
+      if(value.charAt(0) === '$')
+      {
+        const string = value;
+        console.log("Doller aaya doller");
+        const startIndex = string.indexOf('$');
+        const endIndex = string.indexOf('.'); 
+        
+        const firstValue = string.substring(startIndex, endIndex); // Extract the substring from the startIndex to the endIndex
+
+
+             const parts = string.split('.');
+                const SecondValue = parts.slice(1).join('.'); 
+           console.log("Second Value",SecondValue);
+        // console.log(firstValue,"+++++++++++++++++++++++"); 
+       
+          if (testStepData.hasOwnProperty(firstValue)) {
+            const value = testStepData[firstValue];
+            console.log(`Key: ${firstValue}`);
+            console.log(`Value:`);
+            console.log(typeof(value),"%%%%%%%%%%%%%");
+             
+            
+          }
+        }
+  });
+};
+
+
 fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
   if (error) throw error;
   var testResults = [];
 
   // Login
   await login();
-
+  
   // Run Tests
   for (var fileCount = 0; fileCount < fileNames.length; fileCount++) {
     // Load test steps
     var testFile = fileNames[fileCount];
     var testCase = JSON.parse(fs.readFileSync(process.env.TESTS_DIR + "/" + testFile, "utf8"));
     var testCaseResult = false;
+ 
 
-    // Execute test steps
-    for (var testCaseCount = 0; testCaseCount < testCase.steps.length; testCaseCount++) {
+    for (var testStepCount = 0; testStepCount < testCase.steps.length; testStepCount++) {
 
         // Run test step
-        var testStep = testCase.steps[testCaseCount];
+        var testStep = testCase.steps[testStepCount];
         var testResult = {};
-
+        
         if(testStep.method == "delete") testResult = await testDelete(testStep.api, testStep.payload);
         else if(testStep.method == "post") testResult = await testPost(testStep.api, testStep.payload);
         else if(testStep.method == "put") testResult = await testPut(testStep.api, testStep.payload);
         else testResult = await testGet(testStep.api, testStep.payload);
 
-        console.log(testResult)
-
+        // check['test'] = {...check,testResult};
+        testStepData[`$${testStep.name}`] = testResult.data;
+        
+        // console.log(">>>>>>>>>>>>>>>>>>", check);
+        //  console.log(testResult)
         // Validate result
-        testCaseResult = validateResult(testStep.expected, testResult);
+        testCaseResult = validateResult(testStep.expected, testStepData);
         
 
         //   if (swaggerDoc.paths[apiPath].get != null) {
         //   }
     }
+    // console.log("Final test result" , checktestResult)
+    // console.log(">>>>>>>>>>>>>>>>>>", check);
     testResults.push({ test: testCase.name, status: testCaseResult });
+    console.log("TESTRESULTSSSSSSSSSSSSSSSS", testResults);
 
 
     // Save results
@@ -113,6 +152,7 @@ function validateResult(expected, response) {
 function testGet(url, test) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
+    // data = populatePayload(data)
     instance
       .get(url)
       .then((res) => {
@@ -137,6 +177,8 @@ function testGet(url, test) {
 function testPost(url, data) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
+    // var changeData = data;
+    // data = populatePayload(changeData)
     instance
       .post(url, data)
       .then((res) => {
@@ -162,6 +204,8 @@ function testPost(url, data) {
 function testPut(url, data) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
+    var changeData = data;
+    data = populatePayload(changeData)
     instance
       .put(url, data)
       .then((res) => {
@@ -187,6 +231,8 @@ function testPut(url, data) {
 function testDelete(url, data) {
     return new Promise((resolve, reject) => {
       var startTime = process.hrtime();
+      var changeData = data;
+      data = populatePayload(changeData)
       instance
         .delete(url, data)
         .then((res) => {
