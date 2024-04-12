@@ -14,94 +14,80 @@ const instance = axios.create({
   headers: {},
 });
 
-//read directory
-const populatePayload = (data) => {
-  // console.log("data", data);
-  Object.keys(data).forEach((key) => {
-      const value = data[key];
-      console.log(`Key: ${key}, Value: ${value}`);
-      if(value.charAt(0) === '$')
-      {
-        const string = value;
-        console.log("Doller aaya doller");
-        const startIndex = string.indexOf('$');
-        const endIndex = string.indexOf('.'); 
-        
-        const firstValue = string.substring(startIndex, endIndex); // Extract the substring from the startIndex to the endIndex
-
-
-             const parts = string.split('.');
-                const SecondValue = parts.slice(1).join('.'); 
-           console.log("Second Value",SecondValue);
-        // console.log(firstValue,"+++++++++++++++++++++++"); 
-       
-          if (testStepData.hasOwnProperty(firstValue)) {
-            const value = testStepData[firstValue];
-            console.log(`Key: ${firstValue}`);
-            console.log(`Value:`);
-            console.log(typeof(value),"%%%%%%%%%%%%%");
-             
-            
-          }
-        }
-  });
-};
-
-
 fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
   if (error) throw error;
   var testResults = [];
 
   // Login
   await login();
-  
+
   // Run Tests
   for (var fileCount = 0; fileCount < fileNames.length; fileCount++) {
     // Load test steps
     var testFile = fileNames[fileCount];
-    var testCase = JSON.parse(fs.readFileSync(process.env.TESTS_DIR + "/" + testFile, "utf8"));
+    var testCase = JSON.parse(
+      fs.readFileSync(process.env.TESTS_DIR + "/" + testFile, "utf8")
+    );
     var testCaseResult = false;
- 
 
-    for (var testStepCount = 0; testStepCount < testCase.steps.length; testStepCount++) {
+    console.log("************ Executing Test: ", testCase.name, "*************");
 
-        // Run test step
-        var testStep = testCase.steps[testStepCount];
-        var testResult = {};
-        
-        if(testStep.method == "delete") testResult = await testDelete(testStep.api, testStep.payload);
-        else if(testStep.method == "post") testResult = await testPost(testStep.api, testStep.payload);
-        else if(testStep.method == "put") testResult = await testPut(testStep.api, testStep.payload);
-        else testResult = await testGet(testStep.api, testStep.payload);
+    for (
+      var testStepCount = 0;
+      testStepCount < testCase.steps.length;
+      testStepCount++
+    ) {
+      // Run test step
+      var testStep = testCase.steps[testStepCount];
+      var testResult = {};
+      var requestPayload = populatePayload(testStep.payload);
 
-        // check['test'] = {...check,testResult};
-        testStepData[`$${testStep.name}`] = testResult.data;
-        
-        // console.log(">>>>>>>>>>>>>>>>>>", check);
-        //  console.log(testResult)
-        // Validate result
+      console.log("\x1b[30m", "Run => ", testStep.name);
+
+      if (testStep.method == "delete")
+        testResult = await testDelete(testStep.api, requestPayload);
+      else if (testStep.method == "post")
+        testResult = await testPost(testStep.api, requestPayload);
+      else if (testStep.method == "put")
+        testResult = await testPut(testStep.api, requestPayload);
+      else testResult = await testGet(testStep.api, requestPayload);
+
+      // check['test'] = {...check,testResult};
+      testStepData[`$${testStep.name}`] = testResult.data;
+
+      console.log("\x1b[30m", "Response Fetched => ", testStep.name);
+
+      // Validate result
+      if (testStep.expected.status == testResult.httpStatus) {
+        console.log("\x1b[30m", "Validating Response => ", testStep.name);
         testCaseResult = validateResult(testStep.expected, testStepData);
-        
+        console.log("\x1b[34m", "Validated Response => ", testCaseResult);
+      } else {
+        testCaseResult = false;
+        console.log("\x1b[31m", "Invalid Status Code => ", testStep.name);
+      }
 
-        //   if (swaggerDoc.paths[apiPath].get != null) {
-        //   }
+      if (testCaseResult == false) {
+        console.log("\x1b[31m", "Fail => ", testStep.name);
+        testCaseResult = false;
+        break;
+      }
+      console.log("\x1b[32m", "Pass => ", testStep.name);
     }
-    // console.log("Final test result" , checktestResult)
-    // console.log(">>>>>>>>>>>>>>>>>>", check);
+
     testResults.push({ test: testCase.name, status: testCaseResult });
-    console.log("TESTRESULTSSSSSSSSSSSSSSSS", testResults);
-
-
-    // Save results
-    jsonexport(testResults, function (err, csv) {
-      if (err) return console.error(err);
-      const outputFile = "results/test_result_" + new Date().getTime() + ".csv";
-      fs.writeFile(outputFile, csv, function (err) {
-        if (err) return console.error(err);
-        console.log("Results saved at ", outputFile);
-      });
-    });
+    console.log("\x1b[30m","************ Completed *************");
   }
+
+  // Save results
+  jsonexport(testResults, function (err, csv) {
+    if (err) return console.error(err);
+    const outputFile = "results/test_result_" + new Date().getTime() + ".csv";
+    fs.writeFile(outputFile, csv, function (err) {
+      if (err) return console.error(err);
+      console.log("\x1b[30m", "Results saved at ", outputFile);
+    });
+  });
 });
 
 async function login() {
@@ -138,13 +124,40 @@ function parseHrtimeToSeconds(hrtime) {
   return seconds;
 }
 
+//read directory
+function populatePayload(payload, data) {
+  // console.log("data", data);
+  Object.keys(payload).forEach((key) => {
+    if (payload[key].indexOf("$") == 1) {
+      payload[key] = bystring(data, payload[key]);
+    }
+  });
+  return payload;
+}
+
 function validateResult(expected, response) {
   // return false if incorrect status
-  if (expected.status != response.httpStatus) return false;
+  //if (expected.status != response.httpStatus) return false;
+
+  // return false if expected is not same
   Object.keys(expected.response).forEach((responseKey) => {
-    // return false if expected is not same
-    if (expected.response[responseKey] != bystring(response.data, responseKey))
+    if (
+      responseKey.indexOf("$") == 1 &&
+      expected.response[responseKey] != bystring(response, responseKey)
+    ) {
       return false;
+    } else if (
+      typeof expected.response[responseKey] === "string" &&
+      expected.response[responseKey].indexOf("$") == 1 &&
+      bystring(response.data, expected.response[responseKey]) !=
+        bystring(response.data, responseKey)
+    ) {
+      return false;
+    } else if (
+      expected.response[responseKey] != bystring(response, responseKey)
+    ) {
+      return false;
+    }
   });
   return true;
 }
@@ -205,7 +218,7 @@ function testPut(url, data) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
     var changeData = data;
-    data = populatePayload(changeData)
+    //data = populatePayload(changeData)
     instance
       .put(url, data)
       .then((res) => {
@@ -229,28 +242,28 @@ function testPut(url, data) {
 }
 
 function testDelete(url, data) {
-    return new Promise((resolve, reject) => {
-      var startTime = process.hrtime();
-      var changeData = data;
-      data = populatePayload(changeData)
-      instance
-        .delete(url, data)
-        .then((res) => {
-          resolve({
-            status: 1,
-            httpStatus: res.status,
-            duration: parseHrtimeToSeconds(process.hrtime(startTime)),
-            data: res.data,
-            headers: res.headers,
-          });
-        })
-        .catch((err) => {
-          resolve({
-            status: 0,
-            httpStatus: err.response ? err.response.status : 0,
-            duration: parseHrtimeToSeconds(process.hrtime(startTime)),
-            error: err.response ? err.response.statusText : err.code,
-          });
+  return new Promise((resolve, reject) => {
+    var startTime = process.hrtime();
+    var changeData = data;
+    //data = populatePayload(changeData)
+    instance
+      .delete(url, data)
+      .then((res) => {
+        resolve({
+          status: 1,
+          httpStatus: res.status,
+          duration: parseHrtimeToSeconds(process.hrtime(startTime)),
+          data: res.data,
+          headers: res.headers,
         });
-    });
-  }
+      })
+      .catch((err) => {
+        resolve({
+          status: 0,
+          httpStatus: err.response ? err.response.status : 0,
+          duration: parseHrtimeToSeconds(process.hrtime(startTime)),
+          error: err.response ? err.response.statusText : err.code,
+        });
+      });
+  });
+}
