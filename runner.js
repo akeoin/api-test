@@ -14,12 +14,18 @@ const instance = axios.create({
   headers: {},
 });
 
+const instance2 = axios.create({
+  // withCredentials: true,
+  baseURL: process.env.SERVER_URL,
+  // headers: {},
+})
+
 fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
   if (error) throw error;
   var testResults = [];
 
   // Login
-  await login();
+  await login(instance);
 
   // Run Tests
   for (var fileCount = 0; fileCount < fileNames.length; fileCount++) {
@@ -29,32 +35,44 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
       fs.readFileSync(process.env.TESTS_DIR + "/" + testFile, "utf8")
     );
     var testCaseResult = false;
+     // Run tests for instance 1
+  await runTests(instance, fileNames, testResults);
+
+  // Run tests for instance 2
+  await runTests(instance2, fileNames, testResults);
 
     console.log("************ Executing Test: ", testCase.name, "*************");
-
+ async function runTests(instance, fileNames, testResults) {
     for (
       var testStepCount = 0;
       testStepCount < testCase.steps.length;
       testStepCount++
     ) {
-      // Run test step
       var testStep = testCase.steps[testStepCount];
       var testResult = {};
       var requestPayload = populatePayload(testStep.payload);
-
+   
       console.log("\x1b[30m", "Run => ", testStep.name);
-
       if (testStep.method == "delete")
-        testResult = await testDelete(testStep.api, requestPayload);
+        testResult = await testDelete(instance,testStep.api, requestPayload);
       else if (testStep.method == "post")
-        testResult = await testPost(testStep.api, requestPayload);
+        testResult = await testPost(instance,testStep.api, requestPayload);
       else if (testStep.method == "put")
-        testResult = await testPut(testStep.api, requestPayload);
-      else testResult = await testGet(testStep.api, requestPayload);
-
+        testResult = await testPut(instance,testStep.api, requestPayload);
+      else testResult = await testGet(instance,testStep.api, requestPayload);
+        // console.log("RESULYYYYY", testResult);
       // check['test'] = {...check,testResult};
+      if(instance === instance2)
+      {
+         if(testResult.httpStatus == 401)
+         {
+          console.log("Your testStep ", testStep.name , "is safe");
+         }
+      }
+      else
+      {
       testStepData[`$${testStep.name}`] = testResult.data;
-
+      
       console.log("\x1b[30m", "Response Fetched => ", testStep.name);
 
       // Validate result
@@ -64,17 +82,18 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
         console.log("\x1b[34m", "Validated Response => ", testCaseResult);
       } else {
         testCaseResult = false;
-        console.log("\x1b[31m", "Invalid Status Code => ", testStep.name);
+        console.log("\x1b[31m", "Invalid Status Code => ", testResult.httpStatus);
       }
 
       if (testCaseResult == false) {
         console.log("\x1b[31m", "Fail => ", testStep.name);
         testCaseResult = false;
-        break;
+        // break;
       }
-      console.log("\x1b[32m", "Pass => ", testStep.name);
-    }
 
+      // console.log("\x1b[32m", "Pass => ", testStep.name);
+    }
+   
     testResults.push({ test: testCase.name, status: testCaseResult });
     console.log("\x1b[30m","************ Completed *************");
   }
@@ -87,11 +106,12 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
       if (err) return console.error(err);
       console.log("\x1b[30m", "Results saved at ", outputFile);
     });
-  });
-});
+  })}};
+})
 
-async function login() {
-  var loginResult = await testPost("/api/TokenAuth/AuthenticateAdmin", {
+async function login(instance) {
+  // console.log("This is login instance", instance)
+  var loginResult = await testPost(instance,"/api/TokenAuth/AuthenticateAdmin", {
     emailAddress: testData.adminUser,
     phoneNumber: "",
     countryCode: "",
@@ -108,7 +128,7 @@ async function login() {
   }
   instance.defaults.headers.Cookie = loginResult.headers["set-cookie"];
 
-  var setTenantResult = await testPost("/api/TokenAuth/SwitchTenant", {
+  var setTenantResult = await testPost(instance,"/api/TokenAuth/SwitchTenant", {
     tenantId: testData.tenantId,
     rememberMe: false,
     userName: testData.adminUser,
@@ -162,7 +182,7 @@ function validateResult(expected, response) {
   return true;
 }
 
-function testGet(url, test) {
+function testGet(instance,url, test) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
     // data = populatePayload(data)
@@ -187,11 +207,14 @@ function testGet(url, test) {
   });
 }
 
-function testPost(url, data) {
+function testPost(instance,url, data) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
     // var changeData = data;
-    // data = populatePayload(changeData)
+    // // data = populatePayload(changeData)
+    // console.log("I came here");
+    // console.log("URLLLLLLLL", url);
+    // console.log("DATAAAAAA", data);
     instance
       .post(url, data)
       .then((res) => {
@@ -214,7 +237,7 @@ function testPost(url, data) {
   });
 }
 
-function testPut(url, data) {
+function testPut(instance,url, data) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
     var changeData = data;
@@ -241,7 +264,7 @@ function testPut(url, data) {
   });
 }
 
-function testDelete(url, data) {
+function testDelete(instance,url, data) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
     var changeData = data;

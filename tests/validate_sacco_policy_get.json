@@ -15,14 +15,17 @@
       }
     },
     {
-      "name": "updateAboutSaccoPolicy",
+      "name": "2updateAboutSaccoPolicy",
       "api": "/api/policy/aboutsaccospolicy/update",
       "order": 2,
       "method": "put",
       "payload": { 
-        "id": "$getAboutSaccoPolicy.result.id",
-        "scope":"Updated scope of the policy",
-        "activitiesAddress":"Updated address of sacco activities"
+        "scope":"$getAboutSaccoPolicy.result.activitiesAddress",
+        "activitiesAddress":"Updated address of sacco activities",
+        "beginningDateOfFinancialYear": "2024-04-12T05:22:50.727Z",
+        "endDateOfFinancialYear": "2024-04-12T05:22:50.727Z",
+        "objectives": "string"
+     
       },
       "expected": {
         "status": 200,
