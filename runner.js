@@ -3,7 +3,6 @@ const axios = require("axios");
 require("dotenv").config();
 const jsonexport = require("jsonexport");
 const bystring = require("object-bystring");
-var testStepData = {};
 var args = process.argv.slice(2);
 // var swaggerDoc = JSON.parse(fs.readFileSync(args[0], "utf8"));
 var testData = JSON.parse(fs.readFileSync("data.json", "utf8"));
@@ -23,12 +22,15 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
 
   // Run Tests
   for (var fileCount = 0; fileCount < fileNames.length; fileCount++) {
+
     // Load test steps
     var testFile = fileNames[fileCount];
+
     var testCase = JSON.parse(
       fs.readFileSync(process.env.TESTS_DIR + "/" + testFile, "utf8")
     );
     var testCaseResult = false;
+    var testStepData = {};
 
     console.log("************ Executing Test: ", testCase.name, "*************");
 
@@ -40,7 +42,7 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
       // Run test step
       var testStep = testCase.steps[testStepCount];
       var testResult = {};
-      var requestPayload = populatePayload(testStep.payload);
+      var requestPayload = populatePayload(testStep.payload, testStepData);
 
       console.log("\x1b[30m", "Run => ", testStep.name);
 
@@ -64,11 +66,13 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
         console.log("\x1b[34m", "Validated Response => ", testCaseResult);
       } else {
         testCaseResult = false;
-        console.log("\x1b[31m", "Invalid Status Code => ", testStep.name);
+        console.log("\x1b[31m", "Invalid Status Code => ", testResult.httpStatus);
       }
 
       if (testCaseResult == false) {
-        console.log("\x1b[31m", "Fail => ", testStep.name);
+        console.log("\x1b[31m", "Failed Step => ", testStep);
+        console.log("\x1b[30m", "Failed Param => ", requestPayload);
+        console.log("\x1b[30m", "Failed Response => ", testResult);
         testCaseResult = false;
         break;
       }
@@ -80,17 +84,18 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
   }
 
   // Save results
-  jsonexport(testResults, function (err, csv) {
-    if (err) return console.error(err);
-    const outputFile = "results/test_result_" + new Date().getTime() + ".csv";
-    fs.writeFile(outputFile, csv, function (err) {
-      if (err) return console.error(err);
-      console.log("\x1b[30m", "Results saved at ", outputFile);
-    });
-  });
+  // jsonexport(testResults, function (err, csv) {
+  //   if (err) return console.error(err);
+  //   const outputFile = "results/test_result_" + new Date().getTime() + ".csv";
+  //   fs.writeFile(outputFile, csv, function (err) {
+  //     if (err) return console.error(err);
+  //     console.log("\x1b[30m", "Results saved at ", outputFile);
+  //   });
+  // });
 });
 
 async function login() {
+  
   var loginResult = await testPost("/api/TokenAuth/AuthenticateAdmin", {
     emailAddress: testData.adminUser,
     phoneNumber: "",
@@ -126,12 +131,18 @@ function parseHrtimeToSeconds(hrtime) {
 
 //read directory
 function populatePayload(payload, data) {
-  // console.log("data", data);
-  Object.keys(payload).forEach((key) => {
-    if (payload[key].indexOf("$") == 1) {
-      payload[key] = bystring(data, payload[key]);
+  if(payload) {
+    try {
+      Object.keys(payload).forEach((key) => {
+        if (typeof payload[key] === "string" && payload[key].indexOf("$") == 1) {
+          payload[key] = bystring(data, payload[key]);
+        }
+      });
+    } catch(e){
+      console.log(payload,data);
+      throw e;
     }
-  });
+  }
   return payload;
 }
 
