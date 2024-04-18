@@ -1,0 +1,16 @@
+{
+    "name": "Validate_Client_Details",
+    "steps": [
+      {
+        "name": "getClientList",
+        "api": "/api/credit-union/members",
+        "order": 1,
+        "method": "get",
+        "payload": { },
+        "expected": {
+          "status": 200
+        }
+      }
+    ]
+  }
+  

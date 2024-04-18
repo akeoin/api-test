@@ -1,0 +1,53 @@
+{
+  "name": "Validate_Sacco_Policy_Update2",
+  "steps": [
+    {
+      "name": "getAboutSaccoPolicy",
+      "api": "/api/policy/aboutsaccospolicy/get",
+      "order": 1,
+      "method": "get",
+      "payload": { },
+      "expected": {
+        "status": 200,
+        "response": {
+          "$getAboutSaccoPolicy.result.id": 68
+        }
+      }
+    },
+    {
+      "name": "updateAboutSaccoPolicy",
+      "api": "/api/policy/aboutsaccospolicy/update",
+      "order": 2,
+      "method": "put",
+      "payload": { 
+        "id": "$getAboutSaccoPolicy.result.id",
+        "scope":"Updated scope of the policy",
+        "activitiesAddress":"Updated address of sacco activities"
+      },
+      "expected": {
+        "status": 200,
+        "response": {
+          "$updateAboutSaccoPolicy.result.scope": "Updated scope of the policy",
+          "$updateAboutSaccoPolicy.result.activitiesAddress": "Updated address of sacco activities"
+        }
+      }
+    },
+    {
+      "name": "updateAboutSaccoPolicy",
+      "api": "/api/policy/aboutsaccospolicy/update",
+      "order": 2,
+      "method": "put",
+      "payload": { 
+        "scope":"$getAboutSaccoPolicy.result.activitiesAddress",
+        "activitiesAddress":"Updated address of sacco activities"
+      },
+      "expected": {
+        "status": 200,
+        "response": {
+          "$updateAboutSaccoPolicy.result.scope": "Updated scope of the policy",
+          "$updateAboutSaccoPolicy.result.activitiesAddress": "Updated address of sacco activities"
+        }
+      }
+    }
+  ]
+}
