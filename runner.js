@@ -1,11 +1,16 @@
-var fs = require("fs");
+const fs = require("fs");
+const express = require('express');
+const app = express();
+const port = 5000;
 const axios = require("axios");
 require("dotenv").config();
-const jsonexport = require("jsonexport");
 const bystring = require("object-bystring");
-var args = process.argv.slice(2);
-// var swaggerDoc = JSON.parse(fs.readFileSync(args[0], "utf8"));
+
 var testData = JSON.parse(fs.readFileSync("data.json", "utf8"));
+
+app.listen(port, () => {
+  console.log("App is running in port ", port)
+});
 
 const instance = axios.create({
   withCredentials: true,
@@ -21,81 +26,104 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
   await login();
 
   // Run Tests
-  for (var fileCount = 0; fileCount < fileNames.length; fileCount++) {
+  app.get('/events', async (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
 
-    // Load test steps
-    var testFile = fileNames[fileCount];
+    for (var fileCount = 0; fileCount < fileNames.length; fileCount++) {
+        console.log("fileName--------------->", fileNames);
+      // Load test steps
+      var testFile = fileNames[fileCount];
+        console.log("TestFile Name--------------->",testFile);
+      
+        const data = {
+          // FileName: testCase.Name,
+          // Index: testStepCount,
+          // Name: testStep.name,
+          // API: testStep.API,
+          // Method: testStep.method,
+          // BeforePayload: testStep.payload,
+          // ModifiedPayload: requestPayload,
+          // ExpectedResponse: testStep.expectedResponse,
+          // ActualResponse: testResult.data,
+          // Status: testResult.httpStatus
+          TestFileName:testFile
+        };
+        
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      var testCase = JSON.parse(
+        fs.readFileSync(process.env.TESTS_DIR + "/" + testFile, "utf8")
+      );
+      var testCaseResult = false;
+      var testStepData = {};
 
-    var testCase = JSON.parse(
-      fs.readFileSync(process.env.TESTS_DIR + "/" + testFile, "utf8")
-    );
-    var testCaseResult = false;
-    var testStepData = {};
+      console.log("************ Executing Test: ", testCase.name, "*************");
 
-    console.log("************ Executing Test: ", testCase.name, "*************");
+      for (
+        var testStepCount = 0;
+        testStepCount < testCase.steps.length;
+        testStepCount++
+      ) {
+        // Run test step
+        var testStep = testCase.steps[testStepCount];
+        var testResult = {};
+        var requestPayload = populatePayload(testStep.payload, testStepData);
+        console.log("\x1b[30m", "Run => ", testStep.name);
 
-    for (
-      var testStepCount = 0;
-      testStepCount < testCase.steps.length;
-      testStepCount++
-    ) {
-      // Run test step
-      var testStep = testCase.steps[testStepCount];
-      var testResult = {};
-      var requestPayload = populatePayload(testStep.payload, testStepData);
+        if (testStep.method == "delete")
+          testResult = await testDelete(testStep.api, requestPayload);
+        else if (testStep.method == "post")
+          testResult = await testPost(testStep.api, requestPayload);
+        else if (testStep.method == "put")
+          testResult = await testPut(testStep.api, requestPayload);
+        else testResult = await testGet(testStep.api, requestPayload);
 
-      console.log("\x1b[30m", "Run => ", testStep.name);
+        testStepData[`$${testStep.name}`] = testResult.data;
 
-      if (testStep.method == "delete")
-        testResult = await testDelete(testStep.api, requestPayload);
-      else if (testStep.method == "post")
-        testResult = await testPost(testStep.api, requestPayload);
-      else if (testStep.method == "put")
-        testResult = await testPut(testStep.api, requestPayload);
-      else testResult = await testGet(testStep.api, requestPayload);
+        const data2 = {
+          FileName: testCase.Name,
+          Index: testStepCount,
+          Name: testStep.name,
+          API: testStep.API,
+          Method: testStep.method,
+          BeforePayload: testStep.payload,
+          ModifiedPayload: requestPayload,
+          ExpectedResponse: testStep.expectedResponse,
+          ActualResponse: testResult.data,
+          Status: testResult.httpStatus
+        };
 
-      // check['test'] = {...check,testResult};
-      testStepData[`$${testStep.name}`] = testResult.data;
+        res.write(`data2: ${JSON.stringify(data2)}\n\n`);
 
-      console.log("\x1b[30m", "Response Fetched => ", testStep.name);
+        console.log("\x1b[30m", "Response Fetched => ", testStep.name);
 
-      // Validate result
-      if (testStep.expected.status == testResult.httpStatus) {
-        console.log("\x1b[30m", "Validating Response => ", testStep.name);
-        testCaseResult = validateResult(testStep.expected, testStepData);
-        console.log("\x1b[34m", "Validated Response => ", testCaseResult);
-      } else {
-        testCaseResult = false;
-        console.log("\x1b[31m", "Invalid Status Code => ", testResult.httpStatus);
+        // Validate result
+        if (testStep.expected.status == testResult.httpStatus) {
+          console.log("\x1b[30m", "Validating Response => ", testStep.name);
+          testCaseResult = validateResult(testStep.expected, testStepData);
+          console.log("\x1b[34m", "Validated Response => ", testCaseResult);
+        } else {
+          testCaseResult = false;
+          console.log("\x1b[31m", "Invalid Status Code => ", testResult.httpStatus);
+        }
+
+        if (testCaseResult == false) {
+          console.log("\x1b[31m", "Failed Step => ", testStep);
+          console.log("\x1b[30m", "Failed Param => ", requestPayload);
+          console.log("\x1b[30m", "Failed Response => ", testResult);
+          testCaseResult = false;
+        }
+        console.log("\x1b[32m", "Pass => ", testStep.name);
       }
 
-      if (testCaseResult == false) {
-        console.log("\x1b[31m", "Failed Step => ", testStep);
-        console.log("\x1b[30m", "Failed Param => ", requestPayload);
-        console.log("\x1b[30m", "Failed Response => ", testResult);
-        testCaseResult = false;
-        break;
-      }
-      console.log("\x1b[32m", "Pass => ", testStep.name);
+      testResults.push({ test: testCase.name, status: testCaseResult });
+      console.log("\x1b[30m", "************ Completed *************");
     }
-
-    testResults.push({ test: testCase.name, status: testCaseResult });
-    console.log("\x1b[30m","************ Completed *************");
-  }
-
-  // Save results
-  // jsonexport(testResults, function (err, csv) {
-  //   if (err) return console.error(err);
-  //   const outputFile = "results/test_result_" + new Date().getTime() + ".csv";
-  //   fs.writeFile(outputFile, csv, function (err) {
-  //     if (err) return console.error(err);
-  //     console.log("\x1b[30m", "Results saved at ", outputFile);
-  //   });
-  // });
+  });
 });
 
 async function login() {
-  
   var loginResult = await testPost("/api/TokenAuth/AuthenticateAdmin", {
     emailAddress: testData.adminUser,
     phoneNumber: "",
@@ -129,17 +157,16 @@ function parseHrtimeToSeconds(hrtime) {
   return seconds;
 }
 
-//read directory
 function populatePayload(payload, data) {
-  if(payload) {
+  if (payload) {
     try {
       Object.keys(payload).forEach((key) => {
         if (typeof payload[key] === "string" && payload[key].indexOf("$") == 1) {
           payload[key] = bystring(data, payload[key]);
         }
       });
-    } catch(e){
-      console.log(payload,data);
+    } catch (e) {
+      console.log(payload, data);
       throw e;
     }
   }
@@ -147,10 +174,6 @@ function populatePayload(payload, data) {
 }
 
 function validateResult(expected, response) {
-  // return false if incorrect status
-  //if (expected.status != response.httpStatus) return false;
-
-  // return false if expected is not same
   Object.keys(expected.response).forEach((responseKey) => {
     if (
       responseKey.indexOf("$") == 1 &&
@@ -161,7 +184,7 @@ function validateResult(expected, response) {
       typeof expected.response[responseKey] === "string" &&
       expected.response[responseKey].indexOf("$") == 1 &&
       bystring(response.data, expected.response[responseKey]) !=
-        bystring(response.data, responseKey)
+      bystring(response.data, responseKey)
     ) {
       return false;
     } else if (
@@ -176,7 +199,6 @@ function validateResult(expected, response) {
 function testGet(url, test) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
-    // data = populatePayload(data)
     instance
       .get(url)
       .then((res) => {
@@ -201,8 +223,6 @@ function testGet(url, test) {
 function testPost(url, data) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
-    // var changeData = data;
-    // data = populatePayload(changeData)
     instance
       .post(url, data)
       .then((res) => {
@@ -228,8 +248,6 @@ function testPost(url, data) {
 function testPut(url, data) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
-    var changeData = data;
-    //data = populatePayload(changeData)
     instance
       .put(url, data)
       .then((res) => {
@@ -255,8 +273,6 @@ function testPut(url, data) {
 function testDelete(url, data) {
   return new Promise((resolve, reject) => {
     var startTime = process.hrtime();
-    var changeData = data;
-    //data = populatePayload(changeData)
     instance
       .delete(url, data)
       .then((res) => {

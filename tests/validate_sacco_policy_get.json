@@ -1,5 +1,5 @@
 {
-  "name": "Validate_Sacco_Policy_Update",
+  "name": "Validate_Sacco_Policy_Update2",
   "steps": [
     {
       "name": "getAboutSaccoPolicy",
