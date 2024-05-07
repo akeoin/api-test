@@ -1,5 +1,5 @@
 {
-  "name": "Validate_Sacco_Policy_Update",
+  "name": "Validate_Sacco_Policy_UpdateC",
   "steps": [
     {
       "name": "getAboutSaccoPolicy",
@@ -20,7 +20,7 @@
       "order": 2,
       "method": "put",
       "payload": { 
-        "id": "$getAboutSaccoPolicy.result.id",
+        "objectives": "sjdabkjnsaj",
         "scope":"Updated scope of the policy",
         "activitiesAddress":"Updated address of sacco activities"
       },
@@ -38,6 +38,7 @@
       "order": 2,
       "method": "put",
       "payload": { 
+        "objectives": "sjdabkjnsaj",
         "scope":"$getAboutSaccoPolicy.result.activitiesAddress",
         "activitiesAddress":"Updated address of sacco activities"
       },
