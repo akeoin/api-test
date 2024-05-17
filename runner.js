@@ -1,12 +1,22 @@
 var fs = require("fs");
 const axios = require("axios");
+const http = require("http");
+const express = require("express");
 require("dotenv").config();
 const jsonexport = require("jsonexport");
 const bystring = require("object-bystring");
+const cors = require("cors");
+
 var args = process.argv.slice(2);
+const app = express();
+
+const port = 5000;
+app.use(cors());
 // var swaggerDoc = JSON.parse(fs.readFileSync(args[0], "utf8"));
 var testData = JSON.parse(fs.readFileSync("data.json", "utf8"));
-
+app.listen(port,()=>{
+  console.log("Server is listen on port", port);
+})
 const instance = axios.create({
   withCredentials: true,
   baseURL: process.env.SERVER_URL,
@@ -19,12 +29,31 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
 
   // Login
   await login();
+  app.get('/events',async(req,res)=>{
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
 
   // Run Tests
   for (var fileCount = 0; fileCount < fileNames.length; fileCount++) {
 
     // Load test steps
     var testFile = fileNames[fileCount];
+
+    const data1 = {
+      // FileName: testCase.Name,
+      // Index: testStepCount,
+      // Name: testStep.name,
+      // API: testStep.API,
+      // Method: testStep.method,
+      // BeforePayload: testStep.payload,
+      // ModifiedPayload: requestPayload,
+      // ExpectedResponse: testStep.expectedResponse,
+      // ActualResponse: testResult.data,
+      // Status: testResult.httpStatus
+      TestFileName:testFile
+    };
+    res.write(`data: ${JSON.stringify(data1)}\n\n`);
 
     var testCase = JSON.parse(
       fs.readFileSync(process.env.TESTS_DIR + "/" + testFile, "utf8")
@@ -56,7 +85,20 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
 
       // check['test'] = {...check,testResult};
       testStepData[`$${testStep.name}`] = testResult.data;
-
+      const data2 = {
+        // FileName: testCase.Name,
+        Index: testStepCount,
+        Name: testStep.name,
+        API: testStep.API,
+        Method: testStep.method,
+        BeforePayload: testStep.payload,
+        ModifiedPayload: requestPayload,
+        ExpectedResponse: testStep.expectedResponse,
+        ActualResponse: testResult.data,
+        Status: testResult.httpStatus
+      };
+      res.write(`data: ${JSON.stringify(data2)}\n\n`);
+      // res.write(`data2: lakshya\n\n`);
       console.log("\x1b[30m", "Response Fetched => ", testStep.name);
 
       // Validate result
@@ -92,6 +134,7 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
   //     console.log("\x1b[30m", "Results saved at ", outputFile);
   //   });
   // });
+});
 });
 
 async function login() {

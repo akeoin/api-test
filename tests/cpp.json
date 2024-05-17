@@ -1,0 +1,154 @@
+{
+    "name":"create cpp",
+    "steps":[{
+        "name": "creditUnionMember",
+        "api": "/api/credit-union/member",
+        "apiname": "/api/api/credit-union/member",
+        "order": 1,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           
+          }
+        }
+      },
+   
+      {
+        "name": "creditproductpolicy",
+        "api": "/api/policy/creditproductpolicy/getall",
+        "apiname": "/api/api/policy/creditproductpolicy/getall",
+        "order": 2,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           
+          }
+        }
+      }  ,{
+        "name": "usersTenant",
+        "api": "/api/roles/users/tenant",
+        "apiname": "/api/api/roles/users/tenant",
+        "order": 3,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           
+          }
+        }
+      } ,
+      {
+        "name": "GetAccountingCodes",
+        "api": "/api/services/app/Account/GetAccountingCodes",
+        "apiname": "/api/api/services/app/Account/GetAccountingCodes",
+        "order": 4,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           }
+        }
+      },{
+        "name": "creditunioncharges",
+        "api": "/api/creditunioncharges/tenant/get",
+        "apiname": "/api/api/creditunioncharges/tenant/get",
+        "order": 5,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           }
+        }
+      },{
+        "name": "chargeevents",
+        "api": "/api/loanconst/chargeevents",
+        "apiname": "/api/api/loanconst/chargeevents",
+        "order": 6,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           }
+        }
+      },{
+        "name": "periodtype",
+        "api": "/api/loanconst/periodtype",
+        "apiname": "/api/api/loanconst/periodtype",
+        "order": 7,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           }
+        }
+      },{
+        "name": "tenureperiodtype",
+        "api": "/api/loanconst/tenureperiodtype",
+        "apiname": "/api/api/loanconst/tenureperiodtype",
+        "order": 8,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           }
+        }
+      },{
+        "name": "interestratecalculationmethod",
+        "api": "/api/loanconst/interestratecalculationmethod",
+        "apiname": "/api/api/loanconst/interestratecalculationmethod",
+        "order": 9,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           }
+        }
+      },{
+        "name": "loanapplicationstage",
+        "api": "/api/loanconst/loanapplicationstage",
+        "apiname": "/api/api/loanconst/loanapplicationstage",
+        "order": 10,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           }
+        }
+      },{
+        "name": "loantype",
+        "api": "/api/loan/loantype",
+        "apiname": "/api/api/loan/loantype",
+        "order": 11,
+        "method": "get",
+        "payload": { },
+        "params":{ },
+        "expected": {
+          "status": 200,
+          "response": {
+           }
+        }
+      }
+    ]
+}

@@ -2,3 +2,5 @@
 data.json
 node_modules
 .DS_Store
+package.json
+package-lock.json
