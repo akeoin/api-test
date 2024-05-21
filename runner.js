@@ -1,104 +1,93 @@
-var fs = require("fs");
+const fs = require("fs");
 const axios = require("axios");
-const http = require("http");
-const express = require("express");
 require("dotenv").config();
 const jsonexport = require("jsonexport");
 const bystring = require("object-bystring");
+const { log } = require("console");
+const XLSX = require('xlsx');
 const cors = require("cors");
+const express = require("express");
+const FormData = require("form-data");
+const streamConnection = require('./streamconnection'); // Import the streaming connection module
 
 var args = process.argv.slice(2);
+var apilist = new Set();
+var swaggerAPIs = [];
+const port = 5001;
 const app = express();
 
-const port = 5000;
 app.use(cors());
-// var swaggerDoc = JSON.parse(fs.readFileSync(args[0], "utf8"));
 var testData = JSON.parse(fs.readFileSync("data.json", "utf8"));
-app.listen(port,()=>{
-  console.log("Server is listen on port", port);
-})
+
+app.listen(port, () => {
+  console.log("Server is listening on port", port);
+});
+
 const instance = axios.create({
   withCredentials: true,
   baseURL: process.env.SERVER_URL,
   headers: {},
 });
-
+// async function Testing(){
+  console.log("we are in test function")
 fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
   if (error) throw error;
   var testResults = [];
-
+  
   // Login
   await login();
-  app.get('/events',async(req,res)=>{
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
 
   // Run Tests
-  for (var fileCount = 0; fileCount < fileNames.length; fileCount++) {
 
+  
+  for (var fileCount = 0; fileCount < fileNames.length; fileCount++) {
     // Load test steps
     var testFile = fileNames[fileCount];
-
     const data1 = {
-      // FileName: testCase.Name,
-      // Index: testStepCount,
-      // Name: testStep.name,
-      // API: testStep.API,
-      // Method: testStep.method,
-      // BeforePayload: testStep.payload,
-      // ModifiedPayload: requestPayload,
-      // ExpectedResponse: testStep.expectedResponse,
-      // ActualResponse: testResult.data,
-      // Status: testResult.httpStatus
-      TestFileName:testFile
+      TestFileName: testFile
     };
-    res.write(`data: ${JSON.stringify(data1)}\n\n`);
+    streamConnection.sendData(data1); // Send data through the stream connection
 
-    var testCase = JSON.parse(
-      fs.readFileSync(process.env.TESTS_DIR + "/" + testFile, "utf8")
-    );
+    var testCase = JSON.parse(fs.readFileSync(process.env.TESTS_DIR + "/" + testFile, "utf8"));
     var testCaseResult = false;
     var testStepData = {};
 
     console.log("************ Executing Test: ", testCase.name, "*************");
 
-    for (
-      var testStepCount = 0;
-      testStepCount < testCase.steps.length;
-      testStepCount++
-    ) {
+    for (var testStepCount = 0; testStepCount < testCase.steps.length; testStepCount++) {
       // Run test step
       var testStep = testCase.steps[testStepCount];
       var testResult = {};
+      console.log('Before Payload Update', testStep.payload);
       var requestPayload = populatePayload(testStep.payload, testStepData);
+      var requestParams = populateParams(testStep.params, testStepData);
+      var requestapi = populateURL(testStep.api, testStepData);
+      console.log('After Payload Update', requestPayload);
 
       console.log("\x1b[30m", "Run => ", testStep.name);
 
       if (testStep.method == "delete")
-        testResult = await testDelete(testStep.api, requestPayload);
+        testResult = await testDelete(requestapi, requestPayload);
       else if (testStep.method == "post")
-        testResult = await testPost(testStep.api, requestPayload);
+        testResult = await testPost(requestapi, requestPayload);
       else if (testStep.method == "put")
-        testResult = await testPut(testStep.api, requestPayload);
-      else testResult = await testGet(testStep.api, requestPayload);
+        testResult = await testPut(requestapi, requestPayload);
+      else testResult = await testGet(requestapi, requestPayload, requestParams);
 
-      // check['test'] = {...check,testResult};
       testStepData[`$${testStep.name}`] = testResult.data;
       const data2 = {
-        // FileName: testCase.Name,
         Index: testStepCount,
         Name: testStep.name,
         API: testStep.API,
         Method: testStep.method,
         BeforePayload: testStep.payload,
         ModifiedPayload: requestPayload,
-        ExpectedResponse: testStep.expectedResponse,
+        ExpectedResponse: testStep.expected,
         ActualResponse: testResult.data,
         Status: testResult.httpStatus
       };
-      res.write(`data: ${JSON.stringify(data2)}\n\n`);
-      // res.write(`data2: lakshya\n\n`);
+      streamConnection.sendData(data2); // Send data through the stream connection
+
       console.log("\x1b[30m", "Response Fetched => ", testStep.name);
 
       // Validate result
@@ -106,6 +95,8 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
         console.log("\x1b[30m", "Validating Response => ", testStep.name);
         testCaseResult = validateResult(testStep.expected, testStepData);
         console.log("\x1b[34m", "Validated Response => ", testCaseResult);
+        console.log("\x1b[30m", " Response Time => ", testResult.duration);
+        console.log("\x1b[30m", " Response Time => ", testResult);
       } else {
         testCaseResult = false;
         console.log("\x1b[31m", "Invalid Status Code => ", testResult.httpStatus);
@@ -116,14 +107,16 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
         console.log("\x1b[30m", "Failed Param => ", requestPayload);
         console.log("\x1b[30m", "Failed Response => ", testResult);
         testCaseResult = false;
-        break;
       }
       console.log("\x1b[32m", "Pass => ", testStep.name);
     }
 
     testResults.push({ test: testCase.name, status: testCaseResult });
-    console.log("\x1b[30m","************ Completed *************");
+    console.log("\x1b[30m", "************ Completed *************");
   }
+
+
+  
 
   // Save results
   // jsonexport(testResults, function (err, csv) {
@@ -134,11 +127,24 @@ fs.readdir(process.env.TESTS_DIR, async (error, fileNames) => {
   //     console.log("\x1b[30m", "Results saved at ", outputFile);
   //   });
   // });
-});
+  apilist = Array.from(apilist);
+  // fetchSwaggerJSON(swaggerJSONUrl)
+    // .then((swaggerData) => {
+    //   const extractedPaths = extractPaths(swaggerData);
+    //   console.log("List of Extracted Paths:");
+    //   extractedPaths.forEach((path) => {
+    //     swaggerAPIs.push(path);
+    //   });
+    //   createExcelFile(Array.from(apilist), swaggerAPIs);
+    // })
+    // .catch((error) => {
+    //   console.error("Error:", error);
+    // });
 });
 
+// module.exports={Testing}
+
 async function login() {
-  
   var loginResult = await testPost("/api/TokenAuth/AuthenticateAdmin", {
     emailAddress: testData.adminUser,
     phoneNumber: "",
@@ -172,152 +178,126 @@ function parseHrtimeToSeconds(hrtime) {
   return seconds;
 }
 
-//read directory
 function populatePayload(payload, data) {
-  if(payload) {
+  if (payload) {
     try {
       Object.keys(payload).forEach((key) => {
-        if (typeof payload[key] === "string" && payload[key].indexOf("$") == 1) {
+        if (typeof payload[key] === "string" && payload[key].charAt(0) === '$') {
           payload[key] = bystring(data, payload[key]);
+        } else if (typeof payload[key] === 'object') {
+          payload[key] = populatePayload(payload[key], data);
         }
       });
-    } catch(e){
-      console.log(payload,data);
+    } catch (e) {
+      console.log(payload, data);
       throw e;
     }
   }
   return payload;
 }
 
-function validateResult(expected, response) {
-  // return false if incorrect status
-  //if (expected.status != response.httpStatus) return false;
-
-  // return false if expected is not same
-  Object.keys(expected.response).forEach((responseKey) => {
-    if (
-      responseKey.indexOf("$") == 1 &&
-      expected.response[responseKey] != bystring(response, responseKey)
-    ) {
-      return false;
-    } else if (
-      typeof expected.response[responseKey] === "string" &&
-      expected.response[responseKey].indexOf("$") == 1 &&
-      bystring(response.data, expected.response[responseKey]) !=
-        bystring(response.data, responseKey)
-    ) {
-      return false;
-    } else if (
-      expected.response[responseKey] != bystring(response, responseKey)
-    ) {
-      return false;
+function populateParams(params, data) {
+  if (params) {
+    try {
+      Object.keys(params).forEach((key) => {
+        if (typeof params[key] === "string" && params[key].charAt(0) === '$') {
+          params[key] = bystring(data, params[key]);
+        } else if (typeof params[key] === 'object') {
+          params[key] = populateParams(params[key], data);
+        } else if (typeof params[key] === "string" && params[key].charAt(0) === '#') {
+          params[key] = replacePlaceholders(params[key]);
+        }
+      });
+    } catch (e) {
+      console.log(params, data);
+      throw e;
     }
-  });
-  return true;
+  }
+  return params;
 }
 
-function testGet(url, test) {
-  return new Promise((resolve, reject) => {
-    var startTime = process.hrtime();
-    // data = populatePayload(data)
-    instance
-      .get(url)
-      .then((res) => {
-        resolve({
-          status: 1,
-          httpStatus: res.status,
-          duration: parseHrtimeToSeconds(process.hrtime(startTime)),
-          data: res.data,
-        });
-      })
-      .catch((err) => {
-        resolve({
-          status: 0,
-          httpStatus: err.response ? err.response.status : 0,
-          duration: parseHrtimeToSeconds(process.hrtime(startTime)),
-          error: err.response ? err.response.statusText : err.code,
-        });
-      });
-  });
+function replacePlaceholders(str) {
+  if (str === '#PLACEHOLDER#') {
+    return 'REPLACED_VALUE';
+  }
+  return str;
 }
 
-function testPost(url, data) {
-  return new Promise((resolve, reject) => {
-    var startTime = process.hrtime();
-    // var changeData = data;
-    // data = populatePayload(changeData)
-    instance
-      .post(url, data)
-      .then((res) => {
-        resolve({
-          status: 1,
-          httpStatus: res.status,
-          duration: parseHrtimeToSeconds(process.hrtime(startTime)),
-          data: res.data,
-          headers: res.headers,
-        });
-      })
-      .catch((err) => {
-        resolve({
-          status: 0,
-          httpStatus: err.response ? err.response.status : 0,
-          duration: parseHrtimeToSeconds(process.hrtime(startTime)),
-          error: err.response ? err.response.statusText : err.code,
-        });
-      });
-  });
+function populateURL(url, data) {
+  var result = url;
+  if (url) {
+    const urlParams = url.split('/');
+    urlParams.forEach((param) => {
+      if (param.charAt(0) == '$') {
+        result = result.replace(param, bystring(data, param));
+      }
+    });
+  }
+  return result;
 }
 
-function testPut(url, data) {
-  return new Promise((resolve, reject) => {
-    var startTime = process.hrtime();
-    var changeData = data;
-    //data = populatePayload(changeData)
-    instance
-      .put(url, data)
-      .then((res) => {
-        resolve({
-          status: 1,
-          httpStatus: res.status,
-          duration: parseHrtimeToSeconds(process.hrtime(startTime)),
-          data: res.data,
-          headers: res.headers,
-        });
-      })
-      .catch((err) => {
-        resolve({
-          status: 0,
-          httpStatus: err.response ? err.response.status : 0,
-          duration: parseHrtimeToSeconds(process.hrtime(startTime)),
-          error: err.response ? err.response.statusText : err.code,
-        });
-      });
-  });
+async function testGet(url, payload, params) {
+  return makeRequest("get", url, payload, { params });
 }
 
-function testDelete(url, data) {
-  return new Promise((resolve, reject) => {
-    var startTime = process.hrtime();
-    var changeData = data;
-    //data = populatePayload(changeData)
-    instance
-      .delete(url, data)
-      .then((res) => {
-        resolve({
-          status: 1,
-          httpStatus: res.status,
-          duration: parseHrtimeToSeconds(process.hrtime(startTime)),
-          data: res.data,
-          headers: res.headers,
-        });
-      })
-      .catch((err) => {
-        resolve({
-          status: 0,
-          httpStatus: err.response ? err.response.status : 0,
-          duration: parseHrtimeToSeconds(process.hrtime(startTime)),
-          error: err.response ? err.response.statusText : err.code,
-        });
-      });
-  });
+async function testPost(url, payload) {
+  return makeRequest("post", url, payload);
 }
+
+async function testPut(url, payload) {
+  return makeRequest("put", url, payload);
+}
+
+async function testDelete(url, payload) {
+  return makeRequest("delete", url, payload);
+}
+
+async function makeRequest(method, url, payload = null, options = {}) {
+  const startTime = process.hrtime();
+  try {
+    const response = await instance[method](url, payload, options);
+    const endTime = process.hrtime(startTime);
+    const duration = parseHrtimeToSeconds(endTime);
+    return {
+      status: 1,
+      httpStatus: response.status,
+      duration,
+      data: response.data,
+      headers: response.headers,
+    };
+  } catch (err) {
+    const endTime = process.hrtime(startTime);
+    const duration = parseHrtimeToSeconds(endTime);
+    return {
+      status: 0,
+      httpStatus: err.response ? err.response.status : 0,
+      duration,
+      error: err.response ? err.response.statusText : err.code,
+    };
+  }
+}
+
+function validateResult(expected, actual) {
+  return JSON.stringify(expected) === JSON.stringify(actual);
+}
+
+async function fetchSwaggerJSON(url) {
+  const response = await axios.get(url);
+  return response.data;
+}
+
+function extractPaths(swaggerData) {
+  return Object.keys(swaggerData.paths);
+}
+
+function createExcelFile(apilist, swaggerAPIs) {
+  const workbook = XLSX.utils.book_new();
+  const apiListSheet = XLSX.utils.aoa_to_sheet(apilist.map((api, index) => [index + 1, api]));
+  const swaggerSheet = XLSX.utils.aoa_to_sheet(swaggerAPIs.map((api, index) => [index + 1, api]));
+
+  XLSX.utils.book_append_sheet(workbook, apiListSheet, 'API List');
+  XLSX.utils.book_append_sheet(workbook, swaggerSheet, 'Swagger APIs');
+
+  XLSX.writeFile(workbook, 'api_list.xlsx');
+}
+

@@ -11,6 +11,8 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
+import '../collpase.css';
+
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 
@@ -58,13 +60,21 @@ function Row(props) {
                   {row.data2.map((dataRow, rowIndex) => (
                     <TableRow key={rowIndex}>
                       <TableCell>{dataRow.Index}</TableCell>
-                      <TableCell align="right">{dataRow.Name}</TableCell>
-                      <TableCell align="right">{dataRow.Method}</TableCell>
-                      <TableCell align="right"><pre>{JSON.stringify(dataRow.BeforePayload,null,6)}</pre></TableCell>
-                      <TableCell align="right"><pre>{JSON.stringify(dataRow.ModifiedPayload,null,6)}</pre></TableCell>
-                      <TableCell align="right"><pre>{JSON.stringify(dataRow.ExpectedResponse,null,6)}</pre></TableCell>
-                      <TableCell align="right"><pre>{JSON.stringify(dataRow.ActualResponse,null,6)}</pre></TableCell>
-                      <TableCell align="right">{dataRow.Status}</TableCell>
+                      <TableCell align="left" className='border border-gray-800 p-0'>{dataRow.Name}</TableCell>
+                      <TableCell align="left" className='border border-gray-800 p-0'>{dataRow.Method}</TableCell>
+                      <TableCell align="left" className='border border-gray-800 p-0'>
+                        <pre className='h-64 w-48 overflow-scroll'>{JSON.stringify(dataRow.BeforePayload, null, 6)}</pre>
+                      </TableCell>
+                      <TableCell align="left" className='border border-gray-800 p-0'>
+                        <pre className='h-64 w-48 overflow-scroll'>{JSON.stringify(dataRow.ModifiedPayload, null, 6)}</pre>
+                      </TableCell>
+                      <TableCell align="left" className='border border-gray-800 p-0'>
+                        <pre className='h-64 w-48 overflow-scroll'>{JSON.stringify(dataRow.ExpectedResponse, null, 6)}</pre>
+                      </TableCell>
+                      <TableCell align="left" className='border border-gray-800 p-0'>
+                        <pre className='h-64 w-96 overflow-scroll'>{JSON.stringify(dataRow.ActualResponse, null, 6)}</pre>
+                      </TableCell>
+                      <TableCell align="left" className='border border-gray-800 p-0'>{dataRow.Status}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -97,16 +107,22 @@ Row.propTypes = {
 
 export default function CollapsibleTable() {
   const [data, setData] = React.useState([]);
-
+   const [file,setfile]= React.useState("")
+  //  let file2;
   React.useEffect(() => {
-    const eventSource = new EventSource('http://localhost:5000/events');
+    let file2
+    const eventSource = new EventSource('http://localhost:5002/events');
 
     eventSource.onmessage = (event) => {
       const eventData = JSON.parse(event.data);
       console.log("Event Data", eventData);
       
       if (eventData.TestFileName) {
-        console.log("EventData.testFileName: " + eventData.TestFileName);
+        console.log("This is TestFileName", eventData.TestFileName);
+       setfile(eventData.TestFileName)
+       file2 = eventData.TestFileName;
+       console.log("this is my file name",file2)
+        console.log("New file detected:", eventData.TestFileName);
         setData(prevData => {
           const existingEntry = prevData.find(item => item.fileName === eventData.TestFileName);
           if (!existingEntry) {
@@ -114,15 +130,16 @@ export default function CollapsibleTable() {
           }
           return prevData;
         });
-      } else if (eventData.Index !== undefined) {
-        console.log("Event Data2: ",eventData)
-        console.log("Item.filename", eventData.filename)
+      } else if (eventData.Method) {
+        console.log("New data for file:");
         setData(prevData => {
           return prevData.map(item => {
-           
-              console.log("File Name: ",item.fileName)
+            console.log("Item: ",item)
+             if (item.fileName === file2) {
+              console.log("Checking done",item)
               return { ...item, data2: [...item.data2, eventData] };
-            
+             }
+             return item;
           });
         });
       }
@@ -153,6 +170,8 @@ export default function CollapsibleTable() {
           ))}
         </TableBody>
       </Table>
+   
+
     </TableContainer>
   );
 }

@@ -13,9 +13,11 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "form-data": "^4.0.0",
     "http": "^0.0.1-security",
     "jsonexport": "^3.2.0",
     "object-bystring": "^6.0.2",
-    "request": "^2.88.2"
+    "request": "^2.88.2",
+    "xlsx": "^0.18.5"
   }
 }
