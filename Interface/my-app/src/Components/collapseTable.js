@@ -112,7 +112,7 @@ export default function CollapsibleTable() {
   React.useEffect(() => {
     let file2
     const eventSource = new EventSource('http://localhost:5002/events');
-
+    
     eventSource.onmessage = (event) => {
       const eventData = JSON.parse(event.data);
       console.log("Event Data", eventData);
@@ -131,7 +131,7 @@ export default function CollapsibleTable() {
           return prevData;
         });
       } else if (eventData.Method) {
-        console.log("New data for file:");
+        console.log("New data for file:", eventData.name);
         setData(prevData => {
           return prevData.map(item => {
             console.log("Item: ",item)
